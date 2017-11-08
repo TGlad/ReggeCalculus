@@ -254,6 +254,8 @@ void SpaceTime::init()
   }
 }
 
+// TODO: I think the best approach is to switch to absolute sparse matrices throughout.
+
 VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
 {
   for (auto &triPair : triangles)
@@ -299,8 +301,6 @@ double SpaceTime::getDeficitAngle(const Triangle &bone) const
   bone.deficitAngleDot.setZero();
   for (int p = 0; p < (int)bone.tetraPairs.size(); p++)
   {
-#define BREWIN2011
-#if defined(BREWIN2011)
     // in this paper the bone triangle has indices 0,1,2 and the two remaining vertices of this pentachoron attached to the bone are 3,4
     // this means I need edges 0 to i in 1..4, and i to j in 1..4, so I don't need tetrapairs, I need the two other points
     Vertex *vs[5] = { bone.corners[0], bone.corners[1], bone.corners[2], bone.cornerPairs[p][0], bone.cornerPairs[p][1] };
@@ -356,45 +356,6 @@ double SpaceTime::getDeficitAngle(const Triangle &bone) const
             bone.deficitAngleDot(I, J) += mn(i, j) * guvij[u][v][i][j] * 0.5 * -tri->signature;
       }
     }
-
-#else // from Hartle '84
-    Tetrahedron *tetras[2] = { bone.tetraPairs[0][i], bone.tetraPairs[1][i] };
-    // first get the edges.
-    double lengthSqrs[2][4][4];
-    double mixLengthSqrs[4][4];
-    for (int i = 0; i<4; i++)
-    {
-      for (int j = 0; j<4; j++)
-      {
-        for (int k = 0; k<2; k++)
-        {
-          auto &e = edges(tetras[k]->corners[i].point + tetras[k]->corners[j].point);
-          lengthSqrs[k][i][j] = e == edges.end() ? 0 : e.second->lengthSqr;
-        }
-        auto &e = edges(tetras[0]->corners[i].point + tetras[1]->corners[j].point);
-        mixLengthSqrs[i][j] = e == edges.end() ? 0 : e.second->lengthSqr;
-      }
-    }
-
-    Matrix33 dotMat, eMat[2];
-    for (int i = 1; i<4; i++)
-    {
-      for (int j = 1; j<4; j++)
-      {
-        for (int k = 0; k<2; k++)
-          eMat[k](i - 1, j - 1) = 0.5*(lengthSqrs[k][0][i] + lengthSqrs[k][0][j] - lengthSqrs[k][i][j]); // because its Lorentzian
-        dotMat(i - 1, j - 1) = 0.5*(mixLengthSqrs[0][i] + mixLengthSqrs[0][j] - mixLengthSqrs[i][j]);
-      }
-    }
-    // these are scaled down because only the ratio matters
-    double dot = dotMat.det();
-    double volume0 = eMat[0].det();
-    double volume1 = eMat[1].det();
-    double volume = sqrt(volume0*volume1);
-
-    double dihedralAngle = acos(dot / volume); // getting sign right is about orientation
-    sum += dihedralAngle;
-#endif
   }
 
   return bone.signature == 1 ? 2.0*pi - sum : -sum;
