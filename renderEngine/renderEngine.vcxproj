@@ -97,16 +97,16 @@
   <ItemGroup>
     <ClCompile Include="renderEngine.cpp" />
     <ClCompile Include="source\Image.cpp" />
+    <ClCompile Include="source\SpaceTime.cpp" />
     <ClCompile Include="source\Vector3.cpp" />
-    <ClCompile Include="SpaceTime.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\basics.h" />
     <ClInclude Include="include\Image.h" />
     <ClInclude Include="include\ScreenColour.h" />
+    <ClInclude Include="include\Simplices.h" />
+    <ClInclude Include="include\SpaceTime.h" />
     <ClInclude Include="include\Vector3.h" />
-    <ClInclude Include="Simplices.h" />
-    <ClInclude Include="SpaceTime.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

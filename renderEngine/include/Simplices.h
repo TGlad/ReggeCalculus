@@ -25,6 +25,8 @@ struct Line
   vector<struct Triangle *> triangles;
   vector<struct Tetrahedron *> tetrahedrons;
   vector<struct Pentachoron *> pentachorons;
+
+  double signature; // 1 is timelike
 };
 struct Triangle
 {
@@ -48,8 +50,9 @@ struct Triangle
 
   // cached data
   double deficitAngle;
-  double areaSquared, areaSquaredDot, areaDot;
-  SparseMatrix<double> deficitAngleDot; // deficit angle with respect to all edges that cover all pentachorons attached to this triangle
+  double areaSquared;
+  SparseVector<double> areaSquaredDot, areaDot;
+  SparseVector<double> deficitAngleDot; // deficit angle with respect to all edges in full complex
 };
 struct Tetrahedron
 {

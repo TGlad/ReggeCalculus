@@ -24,7 +24,7 @@
     <ClCompile Include="source\Vector3.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="SpaceTime.cpp">
+    <ClCompile Include="source\SpaceTime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -41,10 +41,10 @@
     <ClInclude Include="include\basics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SpaceTime.h">
+    <ClInclude Include="include\Simplices.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Simplices.h">
+    <ClInclude Include="include\SpaceTime.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

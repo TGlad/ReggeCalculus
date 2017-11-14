@@ -2,11 +2,6 @@
 #include "basics.h"
 #include "Simplices.h"
 
-static const int tMax = 10;
-static const int wMax = 10;
-
-static const int TMax = 2 * tMax - 1;
-static const int WMax = 2 * wMax - 1;
 
 struct Spacetime
 {
@@ -21,4 +16,5 @@ struct Spacetime
   void update();
   VectorXd getEdgeErrors(SparseMatrix<double> &jacobian) const;
   double getDeficitAngle(const Triangle &bone) const;
+  void validate() const;
 };

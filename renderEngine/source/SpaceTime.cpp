@@ -1,5 +1,11 @@
 #include "SpaceTime.h"
 
+static const int tMax = 10;
+static const int wMax = 10;
+
+static const int TMax = 2 * tMax - 1;
+static const int WMax = 2 * wMax - 1;
+
 bool SpaceTime::inBounds(const Vector4 &v)
 {
   return v.t >= 0 && v.t < TMax &&
@@ -186,7 +192,7 @@ void SpaceTime::init()
     for (int i = 0; i < (int)bone.pentachorons.size(); i++)
     {
       Pentachoron *pent = bone.pentachorons[i];
-#if 0
+#if 1
       int tetraIndex = 0;
       for (auto &tetra : pent->volumes)
       {
@@ -221,7 +227,15 @@ void SpaceTime::init()
 #endif
     }
   }
-
+  for (auto &edgePair : lines)
+  {
+    Edge &edge = edgePair.second;
+    Vector4 l = edge.corners[1].pos - edge.corners[0].pos;
+    double S = sqrt(sqr(l.x) + sqr(l.y) + sqr(l.z));
+    double T = abs(l.t);
+    double eps = 1e-10;
+    edge.signature = T > S+eps ? -1.0 : (T < S-eps ? 1 : 0);
+  }
   // now go through triangles and set their signature (whether timelike or spacelike)
   for (auto &triPair : triangles)
   {
@@ -232,7 +246,7 @@ void SpaceTime::init()
     for (int i = 0; i < 3; i++)
       difs[i] = abs(tri.corners[i].t - tri.corners[(i + 1) % 3].t);
     if (difs[0]>eps && difs[1] > eps && difs[2] > eps)
-      tri.signature = 1; // temporal
+      tri.signature = -1; // temporal
     else
     {
       int a = difs[0] < difs[1] ? (difs[0] < difs[2] ? 0 : 2) : (difs[1] < difs[2] ? 1 : 2);
@@ -245,9 +259,9 @@ void SpaceTime::init()
       Vector4 dir = pab - pc;
       double x = sqrt(sqr(dir.x) + sqr(dir.y) + sqr(dir.z));
       if (x - abs(dir.t) > eps)
-        tri.signature = -1; // spacelike
+        tri.signature = 1; // spacelike
       else if (x - abs(dir.t) < -eps)
-        tri.signature = 1; // timelike
+        tri.signature = -1; // timelike
       else
         tri.signature = 0; // lightlile
     }
@@ -265,14 +279,30 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
 
     // one facing edge
     int ia = tri->edges[0] == edge ? 0 : (tri->edges[1] == edge ? 1 : 2);
-    double sij = tri->edges[ia]->lengthSqr;
-    double s0i = tri->edges[(ia + 1) % 3]->lengthSqr;
-    double s0j = tri->edges[(ia + 2) % 3]->lengthSqr;
+    Edge *e0i = tri->edges[(ia + 1) % 3];
+    Edge *e0j = tri->edges[(ia + 2) % 3];
+    Edge *eij = tri->edges[ia % 3];
+    double sij = eij->lengthSqr;
+    double s0i = e0i->lengthSqr;
+    double s0j = e0j->lengthSqr;
+
+    // below: Hartle '84 eq 3.7
     tri.areaSquared = (s0i*s0j - 0.25*sqr(s0i + s0j - sij)) / 4.0; // correct
-    tri.areaSquaredDot = (s0i + s0j - sij) / 8.0; // correct 
+    // TODO: I need to make these partial derivatives absolute by using a sparse vector
+    // Hartle '84 eq 3.13. I think this is right:
+    tri.areaSquaredDot(e0i->index) = (1.0 / 8.0) * (s0j + sij - s0i);
+    tri.areaSquaredDot(e0j->index) = (1.0 / 8.0) * (s0i + sij - s0j);
+    tri.areaSquaredDot(eij->index) = (1.0 / 8.0) * (s0i + s0j - sij); 
+ //   tri.areaSquaredDot = (s0i + s0j - sij) / 8.0;  correct 
     tri.areaDot = tri.areaSquaredDot / (2.0 * sqrt(tri.areaSquared)); // correct
-    double areaSquaredDotDot = ;
-    tri.areaDotDot = (areaSquaredDotDot * sqrt(tri.areaSquared) - tri.areaSquaredDot * tri.areaDot) / (2.0*tri.areaSquared);
+    SparseMatrix<double, edges.size(), edges.size()> areaSquaredDotDot;
+
+    areaSquaredDotDot(e0i->index, e0j->index) = 1; areaSquaredDotDot(e0i->index, eij->index) = 1; areaSquaredDotDot(e0i->index, e0i->index) = -1;
+    areaSquaredDotDot(e0j->index, e0i->index) = 1; areaSquaredDotDot(e0j->index, eij->index) = 1; areaSquaredDotDot(e0j->index, e0j->index) = -1;
+    areaSquaredDotDot(eij->index, e0i->index) = 1; areaSquaredDotDot(eij->index, e0j->index) = 1; areaSquaredDotDot(eij->index, eij->index) = -1;
+    areaSquaredDotDot *= 1.0 / 8.0;
+    // TODO: is this transpose correct?
+    tri.areaDotDot = (areaSquaredDotDot * sqrt(tri.areaSquared) - tri.areaSquaredDot * tri.areaDot.transpose()) / (2.0*tri.areaSquared);
   }
 
   VectorXd edgeErrors(edges.size());
@@ -281,15 +311,16 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
   {
     Edge &edge = edgePair.second;
     double sum = 0;
-    MatrixXd jacobianSum;
+    SparseMatrix<double, edges.size(), edges.size()> jacobianSum;
     jacobianSum.setZero;
     double scale = 0.5 * sqrt(edge->lengthSqr);
     for (auto &tri : edge->triangles)
     {
       sum += tri.deficitAngle * tri.areaDot;
-      jacobianSum += tri.deficitAngle * tri.areaDotDot + tri.deficitAngleDot * tri.areaDot;
+      jacobianSum += tri.deficitAngle * tri.areaDotDot + tri.deficitAngleDot * tri.areaDot.transpose();
     }
-    edgeErrors[index++] = sum; // could subtract some value for a simple mass component
+    ASSERT(index++ == edge.index);
+    edgeErrors[edge.index] = sum; // could subtract some value for a simple mass component
     jacobian += jacobianSum;
   }
   return edgeErrors;
@@ -329,7 +360,7 @@ double SpaceTime::getDeficitAngle(const Triangle &bone) const
 
     double phi34;
     double m3m4 = m3.dot(m4);
-    if (bone.signature == 1.0)
+    if (bone.signature == -1)
       phi34 = acos(m3m4);
     else
     {
@@ -340,25 +371,29 @@ double SpaceTime::getDeficitAngle(const Triangle &bone) const
     sum += phi34;
 
     // Jacobian part
-    MatrixXd<double, 5, 5> mn;
-    for (int i = 0; i <= 4; i++)
-      for (int j = 0; j <= 4; j++)
-        mn(i, j) = tetra->signature * 0.5*(m3[i] * n3[j] + m4[i] * n4[j]);
-    double guvij[5][5][5][5]; // Tensor! but simple contents
-    for (int i = 0; i <= 4; i++)
+    SparseVector<double> mn(edges.size());
+    for (int u = 0; u < 4; u++)
     {
-      int I = bone.pentachorons[p].edges[i].index;
-      for (int j = 0; j <= 4; j++)
+      for (int v = 0; v < 4; v++)
       {
-        int J = bone.pentachorons[p].edges[j].index;
-        for (int u = 0; u <= 4; u++)
-          for (int v = 0; v <= 4; v++)
-            bone.deficitAngleDot(I, J) += mn(i, j) * guvij[u][v][i][j] * 0.5 * -tri->signature;
+        double scale = (m3[u] * n3[v] + m4[u] * n4[v]);
+        Edge *edge0 = bone.edgeMatrix[p].edges[0][u + 1];
+        if (edge0)
+          mn(edge0->index) += 0.5*scale; // dguv/ds = 0.5
+        Edge *edge1 = bone.edgeMatrix[p].edges[0][v + 1];
+        if (edge1)
+          mn(edge1->index) += 0.5*scale; // dguv/ds = 0.5
+        Edge *edge2 = bone.edgeMatrix[p].edges[u+1][v + 1];
+        if (edge2)
+          mn(edge2->index) -= 0.5*scale; // dguv/ds = -0.5
       }
     }
+    mn *= 0.5*tetra->signature * bone->signature;
+    
+    bone.deficitAngleDot += mn;
   }
 
-  return bone.signature == 1 ? 2.0*pi - sum : -sum;
+  return bone.signature == -1 ? 2.0*pi - sum : -sum;
 }
 
 void SpaceTime::update()
@@ -374,4 +409,31 @@ void SpaceTime::update()
     for (auto &edgePair : lines)
       edgePair.second->lengthSqr += deltaLengthSqrs[index++];
   }
+}
+
+// correct processing should maintain certain inequalities. See Khavari ch 5.
+void SpaceTime::validate()
+{
+#if 0
+  for (auto &triPair : triangles)
+  {
+    Triangle &tri = triPair.second;
+    if (TTT || SSS)
+    {
+      double maxS = max(tri.edges[0].s, max(tri.edges[1].s, tri.edges[2].s));
+      double sum = 0;
+      for (auto &edge: tri.edges)
+        if (edge.s != maxS)
+          sum += sqrt(edge.s);
+      ASSERT(sqrt(maxS) > sum);
+    }
+    if (SST)
+    {
+      if (pure timelike twin)
+        ASSERT(b > c + a);
+      else
+        ASSERT(c < b + a);
+    }
+  }
+#endif
 }
