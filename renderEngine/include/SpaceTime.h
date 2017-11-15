@@ -17,4 +17,10 @@ struct Spacetime
   VectorXd getEdgeErrors(SparseMatrix<double> &jacobian) const;
   double getDeficitAngle(const Triangle &bone) const;
   void validate() const;
+
+private:
+  build();
+  connect();
+  setTriangleEdgeMatrices();
+  calculateSignatures();
 };

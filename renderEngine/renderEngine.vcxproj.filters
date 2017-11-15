@@ -24,7 +24,10 @@
     <ClCompile Include="source\Vector3.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="source\SpaceTime.cpp">
+    <ClCompile Include="source\SpaceTime_construct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\SpaceTime_run.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
