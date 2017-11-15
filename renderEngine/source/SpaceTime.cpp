@@ -153,7 +153,7 @@ void SpaceTime::init()
     for (int i = 0; i < 5; i++)
       pent.volumes[i]->pentachorons.push_back(&pent);
   }
-  for (auto &tetpair : tetrahedrons) // TODO: set signature in here
+  for (auto &tetpair : tetrahedrons) 
   {
     Tetrahedron &tet = tetpair.second;
     for (int i = 0; i < 4; i++)
@@ -227,6 +227,9 @@ void SpaceTime::init()
 #endif
     }
   }
+
+  // Next: calculate signatures:
+  double eps = 1e-5;
   for (auto &edgePair : lines)
   {
     Edge &edge = edgePair.second;
@@ -236,12 +239,10 @@ void SpaceTime::init()
     double eps = 1e-10;
     edge.signature = T > S+eps ? -1.0 : (T < S-eps ? 1 : 0);
   }
-  // now go through triangles and set their signature (whether timelike or spacelike)
   for (auto &triPair : triangles)
   {
     Triangle &tri = triPair.second;
     tri.jacobian.resize(edges.size(), edges.size());
-    double eps = 1e-5;
     double difs[3];
     for (int i = 0; i < 3; i++)
       difs[i] = abs(tri.corners[i].t - tri.corners[(i + 1) % 3].t);
@@ -265,6 +266,35 @@ void SpaceTime::init()
       else
         tri.signature = 0; // lightlile
     }
+  }
+  for (auto &tetpair : tetrahedrons)
+  {
+    Tetrahedron &tet = tetpair.second;
+    Vector4 m0 = tet.corners[1].pos - tet.corners[0].pos;
+    Vector4 m1 = tet.corners[2].pos - tet.corners[0].pos;
+    Vector4 m2 = tet.corners[3].pos - tet.corners[0].pos;
+    Matrix33 A, B, C, D;
+    A  << m0.x, m0.y, m0.z,
+          m1.x, m1.y, m1.z,
+          m2.x, m2.y, m2.z;
+    B  << m0.t, m0.y, m0.z,
+          m1.t, m1.y, m1.z,
+          m2.t, m2.y, m2.z;
+    C  << m0.t, m0.x, m0.z,
+          m1.t, m1.x, m1.z,
+          m2.t, m2.x, m2.z;
+    D  << m0.t, m0.x, m0.y,
+          m1.t, m1.x, m1.y,
+          m2.t, m2.x, m2.y;
+    // this orthogonal vector is for a Euclidean R4, which is sufficient
+    Vector4 ortho = Vector4(1, 0, 0, 0) * A.determinant() -
+                    Vector4(0, 1, 0, 0) * B.determinant() +
+                    Vector4(0, 0, 1, 0) * C.determinant() - 
+                    Vector4(0, 0, 0, 1) * D.determinant();
+    // how does this tell me the signature?
+    double x = sqr(ortho.x) + sqr(ortho.y) + sqr(ortho.z);
+    double t = abs(ortho.t);
+    tet.signature = t > x + eps ? 1 : (t < x-eps ? -1 : 0); // the opposite sign here is because we are using the orthogonal vector
   }
 }
 
