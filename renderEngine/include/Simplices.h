@@ -39,7 +39,6 @@ struct Triangle
   vector<struct Tetrahedron *> tetrahedrons;
   vector<struct Pentachoron *> pentachorons;
 
-  vector<struct Tetrahedron *> tetraPairs[2]; // one pair for each pentachoron
   struct EdgeMat
   {
     struct Edge *edges[5][5];

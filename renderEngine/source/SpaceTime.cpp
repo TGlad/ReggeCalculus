@@ -187,26 +187,9 @@ void SpaceTime::init()
     Triangle &bone = bonepair.second;
     bone.edgeMatrix.resize(bone.pentachorons.size());
 
-    bone.tetraPairs[0].resize(bone.pentachorons.size());
-    bone.tetraPairs[1].resize(bone.pentachorons.size());
     for (int i = 0; i < (int)bone.pentachorons.size(); i++)
     {
       Pentachoron *pent = bone.pentachorons[i];
-#if 1
-      int tetraIndex = 0;
-      for (auto &tetra : pent->volumes)
-      {
-        for (auto &tr : tetra->faces)
-        {
-          if (tr == &bone)
-          {
-            ASSERT(tetraIndex < 2);
-            bone.tetraPairs[tetraIndex++][i] = tetra;
-          }
-        }
-      }
-      ASSERT(tetraIndex == 2);
-#else
       Vertex *vs[5] = { bone.corners[0], bone.corners[1], bone.corners[2], 0, 0 }; // vs[0] will always be even in all components or odd in all
       int iv = 3;
       int cornerIndex = 0;
@@ -224,7 +207,6 @@ void SpaceTime::init()
           bone.edgeMatrix[i].edges[j][k] = e == edges.end() ? NULL : &e.second;
         }
       }
-#endif
     }
   }
 
@@ -267,6 +249,7 @@ void SpaceTime::init()
         tri.signature = 0; // lightlile
     }
   }
+  /*
   for (auto &tetpair : tetrahedrons)
   {
     Tetrahedron &tet = tetpair.second;
@@ -295,7 +278,7 @@ void SpaceTime::init()
     double x = sqr(ortho.x) + sqr(ortho.y) + sqr(ortho.z);
     double t = abs(ortho.t);
     tet.signature = t > x + eps ? 1 : (t < x-eps ? -1 : 0); // the opposite sign here is because we are using the orthogonal vector
-  }
+  }*/
 }
 
 // TODO: I think the best approach is to switch to absolute sparse matrices throughout.
@@ -323,7 +306,6 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
     tri.areaSquaredDot(e0i->index) = (1.0 / 8.0) * (s0j + sij - s0i);
     tri.areaSquaredDot(e0j->index) = (1.0 / 8.0) * (s0i + sij - s0j);
     tri.areaSquaredDot(eij->index) = (1.0 / 8.0) * (s0i + s0j - sij); 
- //   tri.areaSquaredDot = (s0i + s0j - sij) / 8.0;  correct 
     tri.areaDot = tri.areaSquaredDot / (2.0 * sqrt(tri.areaSquared)); // correct
     SparseMatrix<double, edges.size(), edges.size()> areaSquaredDotDot;
 
@@ -360,13 +342,8 @@ double SpaceTime::getDeficitAngle(const Triangle &bone) const
 {
   double sum = 0;
   bone.deficitAngleDot.setZero();
-  for (int p = 0; p < (int)bone.tetraPairs.size(); p++)
+  for (int p = 0; p < (int)bone.edgeMatrix.size(); p++)
   {
-    // in this paper the bone triangle has indices 0,1,2 and the two remaining vertices of this pentachoron attached to the bone are 3,4
-    // this means I need edges 0 to i in 1..4, and i to j in 1..4, so I don't need tetrapairs, I need the two other points
-    Vertex *vs[5] = { bone.corners[0], bone.corners[1], bone.corners[2], bone.cornerPairs[p][0], bone.cornerPairs[p][1] };
-    Tetrahedron &tetra = tetraPairs[p][0];
-
     double s[5][5]; // square edge lengths
     for (int i = 0; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
@@ -418,7 +395,7 @@ double SpaceTime::getDeficitAngle(const Triangle &bone) const
           mn(edge2->index) -= 0.5*scale; // dguv/ds = -0.5
       }
     }
-    mn *= 0.5*tetra->signature * bone->signature;
+    mn *= 0.5 * bone->signature;
     
     bone.deficitAngleDot += mn;
   }
