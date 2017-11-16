@@ -7,11 +7,9 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
     Triangle &tri = triPair.second;
     tri.deficitAngle = getDeficitAngle(tri);
 
-    // one facing edge
-    int ia = tri->edges[0] == edge ? 0 : (tri->edges[1] == edge ? 1 : 2);
-    Edge *e0i = tri->edges[(ia + 1) % 3];
-    Edge *e0j = tri->edges[(ia + 2) % 3];
-    Edge *eij = tri->edges[ia % 3];
+    Line *e0i = tri.edges[0];
+    Line *e0j = tri.edges[1];
+    Line *eij = tri.edges[2];
     double sij = eij->lengthSqr;
     double s0i = e0i->lengthSqr;
     double s0j = e0j->lengthSqr;
@@ -20,33 +18,32 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
     tri.areaSquared = (s0i*s0j - 0.25*sqr(s0i + s0j - sij)) / 4.0; // correct
     // TODO: I need to make these partial derivatives absolute by using a sparse vector
     // Hartle '84 eq 3.13. I think this is right:
-    tri.areaSquaredDot(e0i->index) = (1.0 / 8.0) * (s0j + sij - s0i);
-    tri.areaSquaredDot(e0j->index) = (1.0 / 8.0) * (s0i + sij - s0j);
-    tri.areaSquaredDot(eij->index) = (1.0 / 8.0) * (s0i + s0j - sij); 
+    tri.areaSquaredDot.coeffRef(e0i->index) = (1.0 / 8.0) * (s0j + sij - s0i);
+    tri.areaSquaredDot.coeffRef(e0j->index) = (1.0 / 8.0) * (s0i + sij - s0j);
+    tri.areaSquaredDot.coeffRef(eij->index) = (1.0 / 8.0) * (s0i + s0j - sij);
     tri.areaDot = tri.areaSquaredDot / (2.0 * sqrt(tri.areaSquared)); // correct
-    SparseMatrix<double, edges.size(), edges.size()> areaSquaredDotDot;
+    SparseMatrix<double> areaSquaredDotDot(lines.size(), lines.size());
 
-    areaSquaredDotDot(e0i->index, e0j->index) = 1; areaSquaredDotDot(e0i->index, eij->index) = 1; areaSquaredDotDot(e0i->index, e0i->index) = -1;
-    areaSquaredDotDot(e0j->index, e0i->index) = 1; areaSquaredDotDot(e0j->index, eij->index) = 1; areaSquaredDotDot(e0j->index, e0j->index) = -1;
-    areaSquaredDotDot(eij->index, e0i->index) = 1; areaSquaredDotDot(eij->index, e0j->index) = 1; areaSquaredDotDot(eij->index, eij->index) = -1;
+    areaSquaredDotDot.coeffRef(e0i->index, e0j->index) = 1; areaSquaredDotDot.coeffRef(e0i->index, eij->index) = 1; areaSquaredDotDot.coeffRef(e0i->index, e0i->index) = -1;
+    areaSquaredDotDot.coeffRef(e0j->index, e0i->index) = 1; areaSquaredDotDot.coeffRef(e0j->index, eij->index) = 1; areaSquaredDotDot.coeffRef(e0j->index, e0j->index) = -1;
+    areaSquaredDotDot.coeffRef(eij->index, e0i->index) = 1; areaSquaredDotDot.coeffRef(eij->index, e0j->index) = 1; areaSquaredDotDot.coeffRef(eij->index, eij->index) = -1;
     areaSquaredDotDot *= 1.0 / 8.0;
     // TODO: is this transpose correct?
     tri.areaDotDot = (areaSquaredDotDot * sqrt(tri.areaSquared) - tri.areaSquaredDot * tri.areaDot.transpose()) / (2.0*tri.areaSquared);
   }
 
-  VectorXd edgeErrors(edges.size());
+  VectorXd edgeErrors(lines.size());
   int index = 0;
-  for (auto &edgePair : edges)
+  for (auto &edgePair : lines)
   {
-    Edge &edge = edgePair.second;
+    Line &edge = edgePair.second;
     double sum = 0;
-    SparseMatrix<double, edges.size(), edges.size()> jacobianSum;
-    jacobianSum.setZero;
-    double scale = 0.5 * sqrt(edge->lengthSqr);
-    for (auto &tri : edge->triangles)
+    SparseMatrix<double> jacobianSum(lines.size(), lines.size());
+    double scale = 0.5 * sqrt(edge.lengthSqr);
+    for (Triangle *tri : edge.triangles)
     {
-      sum += tri.deficitAngle * tri.areaDot;
-      jacobianSum += tri.deficitAngle * tri.areaDotDot + tri.deficitAngleDot * tri.areaDot.transpose();
+      sum += tri->deficitAngle * tri->areaDot;
+      jacobianSum += tri->deficitAngle * tri->areaDotDot + tri->deficitAngleDot * tri->areaDot.transpose();
     }
     ASSERT(index++ == edge.index);
     edgeErrors[edge.index] = sum; // could subtract some value for a simple mass component
@@ -58,7 +55,6 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
 double SpaceTime::getDeficitAngle(const Triangle &bone)
 {
   double sum = 0;
-  bone.deficitAngleDot.setZero();
   for (int p = 0; p < (int)bone.edgeMatrix.size(); p++)
   {
     double s[5][5]; // square edge lengths
@@ -95,7 +91,7 @@ double SpaceTime::getDeficitAngle(const Triangle &bone)
     sum += phi34;
 
     // Jacobian part
-    SparseVector<double> mn(edges.size());
+    SparseVector<double> mn(lines.size());
     for (int u = 0; u < 4; u++)
     {
       for (int v = 0; v < 4; v++)
@@ -122,7 +118,7 @@ double SpaceTime::getDeficitAngle(const Triangle &bone)
 
 void SpaceTime::update()
 {
-  SparseMatrix<double> jacobian(edges.size(), edges.size());
+  SparseMatrix<double> jacobian(lines.size(), lines.size());
   for (int i = 0; i < 10; i++) // multiple Newton iterations
   {
     VectorXd error = getEdgeErrors(jacobian);
