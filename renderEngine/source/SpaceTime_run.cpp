@@ -55,7 +55,7 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
   return edgeErrors;
 }
 
-double SpaceTime::getDeficitAngle(const Triangle &bone) const
+double SpaceTime::getDeficitAngle(const Triangle &bone)
 {
   double sum = 0;
   bone.deficitAngleDot.setZero();

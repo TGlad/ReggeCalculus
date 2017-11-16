@@ -41,7 +41,7 @@ struct Triangle
 
   struct EdgeMat
   {
-    struct Edge *edges[5][5];
+    struct Line *edges[5][5];
   };
   vector<EdgeMat> edgeMatrix;
 

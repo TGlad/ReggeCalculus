@@ -1,4 +1,5 @@
 #include "SpaceTime.h"
+#include <ostream>
 
 static const int tMax = 10;
 static const int wMax = 10;
@@ -190,8 +191,8 @@ void SpaceTime::calculateSignatures()
   double eps = 1e-5;
   for (auto &edgePair : lines)
   {
-    Edge &edge = edgePair.second;
-    Vector4 l = edge.corners[1].pos - edge.corners[0].pos;
+    Line &edge = edgePair.second;
+    Vector4 l = edge.ends[1]->pos - edge.ends[0]->pos;
     double S = sqrt(sqr(l.x) + sqr(l.y) + sqr(l.z));
     double T = abs(l.t);
     double eps = 1e-10;
@@ -200,18 +201,17 @@ void SpaceTime::calculateSignatures()
   for (auto &triPair : triangles)
   {
     Triangle &tri = triPair.second;
-    tri.jacobian.resize(edges.size(), edges.size());
     double difs[3];
     for (int i = 0; i < 3; i++)
-      difs[i] = abs(tri.corners[i].t - tri.corners[(i + 1) % 3].t);
+      difs[i] = abs(tri.corners[i]->pos.t - tri.corners[(i + 1) % 3]->pos.t);
     if (difs[0]>eps && difs[1] > eps && difs[2] > eps)
       tri.signature = -1; // temporal
     else
     {
       int a = difs[0] < difs[1] ? (difs[0] < difs[2] ? 0 : 2) : (difs[1] < difs[2] ? 1 : 2);
-      Vector4 pa = tri.corners[a].pos;
-      Vector4 pb = tri.corners[(a + 1) % 3].pos;
-      Vector4 pc = tri.corners[(a + 2) % 3].pos;
+      Vector4 pa = tri.corners[a]->pos;
+      Vector4 pb = tri.corners[(a + 1) % 3]->pos;
+      Vector4 pc = tri.corners[(a + 2) % 3]->pos;
       double t = (pb - pa).dot(pc - pa) / (pb - pa).magnitudeSquared();
       ASSERT(t >= -eps && t <= 1.0 + eps);
       Vector4 pab = pa + (pb - pa) * t;
@@ -272,9 +272,8 @@ void SpaceTime::setTriangleEdgeMatrices()
       Vertex *vs[5] = { bone.corners[0], bone.corners[1], bone.corners[2], 0, 0 }; // vs[0] will always be even in all components or odd in all
       int iv = 3;
       int cornerIndex = 0;
-      for (auto &cornerPair : pent->corners)
+      for (Vertex *corner : pent->corners)
       {
-        Vertex &corner = cornerPair.second;
         if (corner != bone.corners[0] && corner != bone.corners[1] && corner != bone.corners[2])
           vs[iv++] = corner;
       }
@@ -282,8 +281,8 @@ void SpaceTime::setTriangleEdgeMatrices()
       {
         for (int k = 1; k <= 4; k++)
         {
-          auto &e = edges(vs[j].pos + vs[k].pos);
-          bone.edgeMatrix[i].edges[j][k] = e == edges.end() ? NULL : &e.second;
+          auto &e = lines.find(vs[j]->pos + vs[k]->pos);
+          bone.edgeMatrix[i].edges[j][k] = e == lines.end() ? NULL : &e->second;
         }
       }
     }
