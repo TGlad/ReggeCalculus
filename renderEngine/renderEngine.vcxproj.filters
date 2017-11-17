@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="source\Image.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="renderEngine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -32,12 +29,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\Image.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\ScreenColour.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\basics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
