@@ -1,4 +1,5 @@
 #include "SpaceTime.h"
+#include "/Code/Eigen/SparseLU"
 
 VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
 {
@@ -42,7 +43,7 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
     double scale = 0.5 * sqrt(edge.lengthSqr);
     for (Triangle *tri : edge.triangles)
     {
-      sum += tri->deficitAngle * tri->areaDot;
+      sum += tri->deficitAngle * tri->areaDot.coeff(edge.index);
       jacobianSum += tri->deficitAngle * tri->areaDotDot + tri->deficitAngleDot * tri->areaDot.transpose();
     }
     ASSERT(index++ == edge.index);
@@ -52,7 +53,7 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
   return edgeErrors;
 }
 
-double SpaceTime::getDeficitAngle(const Triangle &bone)
+double SpaceTime::getDeficitAngle(Triangle &bone)
 {
   double sum = 0;
   for (int p = 0; p < (int)bone.edgeMatrix.size(); p++)
@@ -66,8 +67,9 @@ double SpaceTime::getDeficitAngle(const Triangle &bone)
       for (int j = 1; j <= 4; j++)
         g[i][j] = 0.5*(s[0][i] + s[0][j] - s[i][j]);
     Vector4 n3 = -sign(g[4][4]) * Vector4(g[4][1], g[4][2], g[4][3], g[4][4]) / sqrt(abs(g[3][3]));
-    double h[4][4];
+    Vector4 n4 = -sign(g[3][3]) * Vector4(g[3][1], g[3][2], g[3][3], g[3][4]) / sqrt(abs(g[4][4])); // TODO: is this correct?
 
+    double h[4][4];
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
         h[i][j] = g[i][j] - (g[4][i] * g[4][j]) / g[4][4];
@@ -76,7 +78,7 @@ double SpaceTime::getDeficitAngle(const Triangle &bone)
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
         h[i][j] = g[i][j] - (g[3][i] * g[3][j]) / g[3][3];
-    Vector4 m4 = -sign(h[4][4]) * Vector4(h[3][1], h[3][2], h[3][3], h[3][4]) / sqrt(abs(h[4][4]));
+    Vector4 m4 = -sign(h[4][4]) * Vector4(h[3][1], h[3][2], h[3][3], h[3][4]) / sqrt(abs(h[4][4])); // TODO: is this correct?
 
     double phi34;
     double m3m4 = m3.dot(m4);
@@ -97,18 +99,18 @@ double SpaceTime::getDeficitAngle(const Triangle &bone)
       for (int v = 0; v < 4; v++)
       {
         double scale = (m3[u] * n3[v] + m4[u] * n4[v]);
-        Edge *edge0 = bone.edgeMatrix[p].edges[0][u + 1];
+        Line *edge0 = bone.edgeMatrix[p].edges[0][u + 1];
         if (edge0)
-          mn(edge0->index) += 0.5*scale; // dguv/ds = 0.5
-        Edge *edge1 = bone.edgeMatrix[p].edges[0][v + 1];
+          mn.coeffRef(edge0->index) += 0.5*scale; // dguv/ds = 0.5
+        Line *edge1 = bone.edgeMatrix[p].edges[0][v + 1];
         if (edge1)
-          mn(edge1->index) += 0.5*scale; // dguv/ds = 0.5
-        Edge *edge2 = bone.edgeMatrix[p].edges[u+1][v + 1];
+          mn.coeffRef(edge1->index) += 0.5*scale; // dguv/ds = 0.5
+        Line *edge2 = bone.edgeMatrix[p].edges[u+1][v + 1];
         if (edge2)
-          mn(edge2->index) -= 0.5*scale; // dguv/ds = -0.5
+          mn.coeffRef(edge2->index) -= 0.5*scale; // dguv/ds = -0.5
       }
     }
-    mn *= 0.5 * bone->signature;
+    mn *= 0.5 * bone.signature;
     
     bone.deficitAngleDot += mn;
   }
@@ -123,37 +125,11 @@ void SpaceTime::update()
   {
     VectorXd error = getEdgeErrors(jacobian);
     SparseLU<SparseMatrix<double> > solver;
-    solver.compute(Jacobian);
+    solver.compute(jacobian);
     VectorXd deltaLengthSqrs = solver.solve(-error);
-    int index;
+    int index = 0;
     for (auto &edgePair : lines)
-      edgePair.second->lengthSqr += deltaLengthSqrs[index++];
+      edgePair.second.lengthSqr += deltaLengthSqrs[index++];
   }
 }
 
-// correct processing should maintain certain inequalities. See Khavari ch 5.
-void SpaceTime::validate()
-{
-#if 0
-  for (auto &triPair : triangles)
-  {
-    Triangle &tri = triPair.second;
-    if (TTT || SSS)
-    {
-      double maxS = max(tri.edges[0].s, max(tri.edges[1].s, tri.edges[2].s));
-      double sum = 0;
-      for (auto &edge: tri.edges)
-        if (edge.s != maxS)
-          sum += sqrt(edge.s);
-      ASSERT(sqrt(maxS) > sum);
-    }
-    if (SST)
-    {
-      if (pure timelike twin)
-        ASSERT(b > c + a);
-      else
-        ASSERT(c < b + a);
-    }
-  }
-#endif
-}

@@ -14,7 +14,7 @@
 using namespace std;
 using namespace Eigen;
 #define pi 3.1415926
-#define ASSERT(x) if (!(x)) cout << "error" << endl;
+#define ASSERT(x) if (!(x)) cout << "error" << endl
 
 inline double sign(double x){ return x > 0.0 ? 1.0 : -1.0; }
 
