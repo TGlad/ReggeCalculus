@@ -99,7 +99,7 @@
     <ClCompile Include="source\Image.cpp" />
     <ClCompile Include="source\SpaceTime_construct.cpp" />
     <ClCompile Include="source\SpaceTime_run.cpp" />
-    <ClCompile Include="source\Vector3.cpp" />
+    <ClCompile Include="source\Vector4.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\basics.h" />
@@ -107,7 +107,7 @@
     <ClInclude Include="include\ScreenColour.h" />
     <ClInclude Include="include\Simplices.h" />
     <ClInclude Include="include\SpaceTime.h" />
-    <ClInclude Include="include\Vector3.h" />
+    <ClInclude Include="include\Vector4.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

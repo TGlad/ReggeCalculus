@@ -10,7 +10,7 @@
 #include "/Code/Eigen/Eigen"
 #include "/Code/Eigen/StdVector"
 #include "/Code/Eigen/SparseCore"
-#include "Vector3.h"
+#include "Vector4.h"
 using namespace std;
 using namespace Eigen;
 #define pi 3.1415926
