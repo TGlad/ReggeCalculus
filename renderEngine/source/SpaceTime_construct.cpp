@@ -277,6 +277,7 @@ void SpaceTime::setTriangleEdgeMatrices()
         if (corner != bone.corners[0] && corner != bone.corners[1] && corner != bone.corners[2])
           vs[iv++] = corner;
       }
+      ASSERT(iv == 5);
       for (int j = 0; j <= 4; j++)
       {
         for (int k = 1; k <= 4; k++)
@@ -289,11 +290,22 @@ void SpaceTime::setTriangleEdgeMatrices()
   }
 }
 
+void SpaceTime::calculateEdgeLengths()
+{
+  for (auto &linePair : lines)
+  {
+    Line &edge = linePair.second;
+    Vector4 dif = edge.ends[1]->pos - edge.ends[0]->pos;
+    edge.lengthSqr = -sqr(dif.t) + sqr(dif.x) + sqr(dif.y) + sqr(dif.z);
+  }
+}
+
 void SpaceTime::init()
 {
   build();
   connect();
   setTriangleEdgeMatrices();
   calculateSignatures();
+  calculateEdgeLengths();
 }
 

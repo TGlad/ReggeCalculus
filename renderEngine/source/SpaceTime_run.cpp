@@ -19,9 +19,11 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
     tri.areaSquared = (s0i*s0j - 0.25*sqr(s0i + s0j - sij)) / 4.0; // correct
     // TODO: I need to make these partial derivatives absolute by using a sparse vector
     // Hartle '84 eq 3.13. I think this is right:
+    tri.areaSquaredDot.resize(lines.size());
     tri.areaSquaredDot.coeffRef(e0i->index) = (1.0 / 8.0) * (s0j + sij - s0i);
     tri.areaSquaredDot.coeffRef(e0j->index) = (1.0 / 8.0) * (s0i + sij - s0j);
     tri.areaSquaredDot.coeffRef(eij->index) = (1.0 / 8.0) * (s0i + s0j - sij);
+    tri.areaDot.resize(lines.size());
     tri.areaDot = tri.areaSquaredDot / (2.0 * sqrt(tri.areaSquared)); // correct
     SparseMatrix<double> areaSquaredDotDot(lines.size(), lines.size());
 
@@ -56,6 +58,7 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
 double SpaceTime::getDeficitAngle(Triangle &bone)
 {
   double sum = 0;
+  bone.deficitAngleDot.resize(lines.size());
   for (int p = 0; p < (int)bone.edgeMatrix.size(); p++)
   {
     double s[5][5]; // square edge lengths
@@ -69,7 +72,7 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     Vector4 n3 = -sign(g[4][4]) * Vector4(g[4][1], g[4][2], g[4][3], g[4][4]) / sqrt(abs(g[3][3]));
     Vector4 n4 = -sign(g[3][3]) * Vector4(g[3][1], g[3][2], g[3][3], g[3][4]) / sqrt(abs(g[4][4])); // TODO: is this correct?
 
-    double h[4][4];
+    double h[5][5];
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
         h[i][j] = g[i][j] - (g[4][i] * g[4][j]) / g[4][4];

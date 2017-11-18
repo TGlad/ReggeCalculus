@@ -22,7 +22,7 @@ public:
   inline bool operator <(const Vector4 &f) const
   {
     double a = t + 100.1*x + 100.1*100.1*y + 100.1*100.1*100.1*z;
-    double b = t + 100.1*f.x + 100.1*100.1*f.y + 100.1*100.1*100.1*f.z;
+    double b = f.t + 100.1*f.x + 100.1*100.1*f.y + 100.1*100.1*100.1*f.z;
     return a < b;
   }
   inline Vector4 operator *(double f) const
@@ -32,6 +32,10 @@ public:
   inline Vector4 operator *(const Vector4& vec) const
   {
     return Vector4(t * vec.t, x * vec.x, y * vec.y, z * vec.z);
+  }
+  inline bool operator ==(const Vector4 &vec)
+  {
+    return t == vec.t && x == vec.x && y == vec.y && z == vec.z;
   }
   inline void operator *=(double f)
   {

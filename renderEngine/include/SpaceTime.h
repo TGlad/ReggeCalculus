@@ -21,4 +21,5 @@ private:
   void connect();
   void setTriangleEdgeMatrices();
   void calculateSignatures();
+  void calculateEdgeLengths();
 };
