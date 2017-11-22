@@ -7,6 +7,8 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
   {
     Triangle &tri = triPair.second;
     tri.deficitAngle = getDeficitAngle(tri);
+    if (!(tri.deficitAngle == tri.deficitAngle) || (tri.deficitAngle && abs(tri.deficitAngle) < 1e-20))
+      cout << "blah" << endl;
 
     Line *e0i = tri.edges[0];
     Line *e0j = tri.edges[1];
@@ -17,6 +19,8 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
 
     // below: Hartle '84 eq 3.7
     tri.areaSquared = (s0i*s0j - 0.25*sqr(s0i + s0j - sij)) / 4.0; // correct
+    if (abs(tri.areaSquared) < 1e-20)
+      cout << "blah" << endl;
     // TODO: I need to make these partial derivatives absolute by using a sparse vector
     // Hartle '84 eq 3.13. I think this is right:
     tri.areaSquaredDot.resize(lines.size());
@@ -36,7 +40,6 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
   }
 
   VectorXd edgeErrors(lines.size());
-  int index = 0;
   for (auto &edgePair : lines)
   {
     Line &edge = edgePair.second;
@@ -48,7 +51,6 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
       sum += tri->deficitAngle * tri->areaDot.coeff(edge.index);
       jacobianSum += tri->deficitAngle * tri->areaDotDot + tri->deficitAngleDot * tri->areaDot.transpose();
     }
-    ASSERT(index++ == edge.index);
     edgeErrors[edge.index] = sum; // could subtract some value for a simple mass component
     jacobian += jacobianSum;
   }
@@ -59,16 +61,23 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
 {
   double sum = 0;
   bone.deficitAngleDot.resize(lines.size());
-  for (int p = 0; p < (int)bone.edgeMatrix.size(); p++)
+  static int xx = 0;
+  for (int p = 0; p < (int)bone.pentachorons.size(); p++)
   {
+    Pentachoron *penta = bone.pentachorons[p];
     double s[5][5]; // square edge lengths
     for (int i = 0; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
-        s[i][j] = bone.edgeMatrix[p].edges[i][j] ? bone.edgeMatrix[p].edges[i][j]->lengthSqr : 0;
+        s[i][j] = penta->edgeMatrix[i][j] ? penta->edgeMatrix[i][j]->lengthSqr : 0; // error is in this edgeMatrix
     double g[5][5]; // we don't use the 0 index, to match Brewin
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
-        g[i][j] = 0.5*(s[0][i] + s[0][j] - s[i][j]);
+        g[i][j] = 0.5*(s[0][i] + s[0][j] - s[i][j]); // g[4][4] will be zero whenever edge [0][4] is timelike...  so h will all be undef
+    if (abs(g[4][4]) < 1e-20 || abs(g[3][3]) < 1e-20)
+    {
+      cout << "bad g metric" << endl;
+      ASSERT(false);
+    }
     Vector4 n3 = -sign(g[4][4]) * Vector4(g[4][1], g[4][2], g[4][3], g[4][4]) / sqrt(abs(g[3][3]));
     Vector4 n4 = -sign(g[3][3]) * Vector4(g[3][1], g[3][2], g[3][3], g[3][4]) / sqrt(abs(g[4][4])); // TODO: is this correct?
 
@@ -76,11 +85,21 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
         h[i][j] = g[i][j] - (g[4][i] * g[4][j]) / g[4][4];
+    if (abs(h[3][3]) < 1e-20)
+    {
+      cout << "bad h metric" << endl;
+      ASSERT(false);
+    }
     Vector4 m3 = -sign(h[3][3]) * Vector4(h[4][1], h[4][2], h[4][3], h[4][4]) / sqrt(abs(h[3][3]));
     // m4 just symmetric to the m3 block above
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
         h[i][j] = g[i][j] - (g[3][i] * g[3][j]) / g[3][3];
+    if (abs(h[4][4]) < 1e-20)
+    {
+      cout << "bad h metric 2" << endl;
+      ASSERT(false);
+    }
     Vector4 m4 = -sign(h[4][4]) * Vector4(h[3][1], h[3][2], h[3][3], h[3][4]) / sqrt(abs(h[4][4])); // TODO: is this correct?
 
     double phi34;
@@ -93,7 +112,10 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
       double rho12 = abs(m3m4) < abs(n3m4) ? sign(n3m4)*m3m4 : sign(m3m4)*n3m4;
       phi34 = sign(m3.dot(m3)) * asinh(rho12);
     }
+    if (!(phi34 == phi34) || (phi34 && abs(phi34) < 1e-20))
+      cout << "blah" << endl;
     sum += phi34;
+    xx++;
 
     // Jacobian part
     SparseVector<double> mn(lines.size());
@@ -102,13 +124,13 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
       for (int v = 0; v < 4; v++)
       {
         double scale = (m3[u] * n3[v] + m4[u] * n4[v]);
-        Line *edge0 = bone.edgeMatrix[p].edges[0][u + 1];
+        Line *edge0 = penta->edgeMatrix[0][u + 1];
         if (edge0)
           mn.coeffRef(edge0->index) += 0.5*scale; // dguv/ds = 0.5
-        Line *edge1 = bone.edgeMatrix[p].edges[0][v + 1];
+        Line *edge1 = penta->edgeMatrix[0][v + 1];
         if (edge1)
           mn.coeffRef(edge1->index) += 0.5*scale; // dguv/ds = 0.5
-        Line *edge2 = bone.edgeMatrix[p].edges[u+1][v + 1];
+        Line *edge2 = penta->edgeMatrix[u+1][v + 1];
         if (edge2)
           mn.coeffRef(edge2->index) -= 0.5*scale; // dguv/ds = -0.5
       }

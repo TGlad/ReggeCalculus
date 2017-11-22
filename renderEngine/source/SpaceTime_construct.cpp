@@ -1,8 +1,8 @@
 #include "SpaceTime.h"
 #include <ostream>
 
-static const int tMax = 10;
-static const int wMax = 10;
+static const int tMax = 4;// 10;
+static const int wMax = 4;// 10;
 
 static const int TMax = 2 * tMax - 1;
 static const int WMax = 2 * wMax - 1;
@@ -261,6 +261,24 @@ void SpaceTime::setTriangleEdgeMatrices()
 {
   // Next set some links that are specific to Regge algebra
   // each triangle needs to know the two tetrahedra that border each pentachoron
+  for (auto &pentaPair : pentachorons)
+  {
+    Pentachoron &penta = pentaPair.second;
+    for (int j = 0; j <= 4; j++)
+    {
+      for (int k = 1; k <= 4; k++)
+      {
+        auto &e = lines.find(penta.corners[j]->pos + penta.corners[k]->pos);
+        penta.edgeMatrix[j][k] = e == lines.end() ? NULL : &e->second;
+        if (j == 0 && k == 4 && (penta.edgeMatrix[j][k] == NULL || abs(penta.edgeMatrix[j][k]->lengthSqr) < 1e-20))
+        {
+          cout << "bad edge 4 " << endl;
+        }
+      }
+    }
+  }
+  /*
+  int ii = 0;
   for (auto &bonepair : triangles)
   {
     Triangle &bone = bonepair.second;
@@ -277,17 +295,35 @@ void SpaceTime::setTriangleEdgeMatrices()
         if (corner != bone.corners[0] && corner != bone.corners[1] && corner != bone.corners[2])
           vs[iv++] = corner;
       }
+      int istart = 0;
+      while (((int)(vs[istart]->pos.t + vs[istart]->pos.x + vs[istart]->pos.y + vs[istart]->pos.z)) % 4 != 0 && 
+        ((int)vs[istart]->pos.t) % 2 != 1 && ((int)vs[istart]->pos.x) % 2 != 1 && ((int)vs[istart]->pos.y) % 2 != 1 && ((int)vs[istart]->pos.z) % 2 != 1)
+      {
+        istart++;
+        if (istart > 4)
+          cout << "bad" << endl;
+      }
       ASSERT(iv == 5);
+      if (ii == 14)
+        cout << "blah" << endl;
       for (int j = 0; j <= 4; j++)
       {
+        int J = (j + istart) % 5;
+
         for (int k = 1; k <= 4; k++)
         {
-          auto &e = lines.find(vs[j]->pos + vs[k]->pos);
+          int K = (k + istart) % 5;
+          auto &e = lines.find(vs[J]->pos + vs[K]->pos);
           bone.edgeMatrix[i].edges[j][k] = e == lines.end() ? NULL : &e->second;
+          if (j == 0 && k == 4 && (bone.edgeMatrix[i].edges[j][k]==NULL || abs(bone.edgeMatrix[i].edges[j][k]->lengthSqr) < 1e-20))
+          {
+            cout << "bad edge 4 " << endl;
+          }
         }
       }
     }
-  }
+    ii++;
+  }*/
 }
 
 void SpaceTime::calculateEdgeLengths()
@@ -303,9 +339,9 @@ void SpaceTime::calculateEdgeLengths()
 void SpaceTime::init()
 {
   build();
+  calculateEdgeLengths();
   connect();
   setTriangleEdgeMatrices();
   calculateSignatures();
-  calculateEdgeLengths();
 }
 

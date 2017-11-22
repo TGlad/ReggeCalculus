@@ -39,12 +39,6 @@ struct Triangle
   vector<struct Tetrahedron *> tetrahedrons;
   vector<struct Pentachoron *> pentachorons;
 
-  struct EdgeMat
-  {
-    struct Line *edges[5][5];
-  };
-  vector<EdgeMat> edgeMatrix;
-
   double signature; // 1 = timelike, -1 = spacelike, 0 = lightlike
 
   // cached data
@@ -74,4 +68,6 @@ struct Pentachoron
   Line *edges[10];
   Triangle *faces[10];
   Tetrahedron *volumes[5];
+
+  Line *edgeMatrix[5][5];
 };
