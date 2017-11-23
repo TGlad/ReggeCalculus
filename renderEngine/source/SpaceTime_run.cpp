@@ -73,6 +73,18 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
         g[i][j] = 0.5*(s[0][i] + s[0][j] - s[i][j]); // g[4][4] will be zero whenever edge [0][4] is timelike...  so h will all be undef
+    // TODO: I need to inverse this 4x4 matrix!, seems a bit slow! Is there a shortcut?
+#define UPSTAIRS_TO_DOWNSTAIRS
+#if defined(UPSTAIRS_TO_DOWNSTAIRS)
+    Matrix<double, 4, 4> G;
+    for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++)
+      G(i, j) = g[i + 1][j + 1];
+    G = G.inverse().eval();
+    for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++)
+      g[i + 1][j + 1] = G(i, j);
+#endif
+
+
     if (abs(g[4][4]) < 1e-20 || abs(g[3][3]) < 1e-20)
     {
       cout << "bad g metric" << endl;
@@ -85,12 +97,13 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
         h[i][j] = g[i][j] - (g[4][i] * g[4][j]) / g[4][4];
+    bool off = ((int)penta->corners[0]->pos.t) % 2 || ((int)penta->corners[0]->pos.x) % 2 || ((int)penta->corners[0]->pos.y) % 2 || ((int)penta->corners[0]->pos.z) % 2;
     if (abs(h[3][3]) < 1e-20)
     {
       cout << "bad h metric" << endl;
-      ASSERT(false);
+//      ASSERT(false);
     }
-    Vector4 m3 = -sign(h[3][3]) * Vector4(h[4][1], h[4][2], h[4][3], h[4][4]) / sqrt(abs(h[3][3]));
+    Vector4 m3 = -sign(h[3][3]) * Vector4(h[4][1], h[4][2], h[4][3], h[4][4]) / sqrt(abs(h[3][3]) + 1e-10);
     // m4 just symmetric to the m3 block above
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
@@ -100,7 +113,7 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
       cout << "bad h metric 2" << endl;
       ASSERT(false);
     }
-    Vector4 m4 = -sign(h[4][4]) * Vector4(h[3][1], h[3][2], h[3][3], h[3][4]) / sqrt(abs(h[4][4])); // TODO: is this correct?
+    Vector4 m4 = -sign(h[4][4]) * Vector4(h[3][1], h[3][2], h[3][3], h[3][4]) / sqrt(abs(h[4][4]) + 1e-10); // TODO: is this correct?
 
     double phi34;
     double m3m4 = m3.dot(m4);

@@ -86,7 +86,19 @@ void SpaceTime::build()
                             vertices[4] = &points[coords[4]];
                             Vector4 ev = coords[0] + coords[1] + coords[2] + coords[3] + coords[4];
                             if (pentachorons.find(ev) == pentachorons.end())
-                              pentachorons[ev] = Pentachoron(vertices[0], vertices[1], vertices[2], vertices[3], vertices[4]);
+                            {
+                              double sign = st*sx*sy*sz;
+                              if (h)
+                              {
+                                sign = -sign;
+                                if (i != 0)
+                                  cout << "bll" << endl;
+                              }
+                              if (sign > 0)
+                                pentachorons[ev] = Pentachoron(vertices[0], vertices[1], vertices[2], vertices[3], vertices[4]);
+                              else
+                                pentachorons[ev] = Pentachoron(vertices[0], vertices[1], vertices[2], vertices[4], vertices[3]); // reverse orientation, is this right?
+                            }
                           }
                         }
                       }
@@ -277,53 +289,6 @@ void SpaceTime::setTriangleEdgeMatrices()
       }
     }
   }
-  /*
-  int ii = 0;
-  for (auto &bonepair : triangles)
-  {
-    Triangle &bone = bonepair.second;
-    bone.edgeMatrix.resize(bone.pentachorons.size());
-
-    for (int i = 0; i < (int)bone.pentachorons.size(); i++)
-    {
-      Pentachoron *pent = bone.pentachorons[i];
-      Vertex *vs[5] = { bone.corners[0], bone.corners[1], bone.corners[2], 0, 0 }; // vs[0] will always be even in all components or odd in all
-      int iv = 3;
-      int cornerIndex = 0;
-      for (Vertex *corner : pent->corners)
-      {
-        if (corner != bone.corners[0] && corner != bone.corners[1] && corner != bone.corners[2])
-          vs[iv++] = corner;
-      }
-      int istart = 0;
-      while (((int)(vs[istart]->pos.t + vs[istart]->pos.x + vs[istart]->pos.y + vs[istart]->pos.z)) % 4 != 0 && 
-        ((int)vs[istart]->pos.t) % 2 != 1 && ((int)vs[istart]->pos.x) % 2 != 1 && ((int)vs[istart]->pos.y) % 2 != 1 && ((int)vs[istart]->pos.z) % 2 != 1)
-      {
-        istart++;
-        if (istart > 4)
-          cout << "bad" << endl;
-      }
-      ASSERT(iv == 5);
-      if (ii == 14)
-        cout << "blah" << endl;
-      for (int j = 0; j <= 4; j++)
-      {
-        int J = (j + istart) % 5;
-
-        for (int k = 1; k <= 4; k++)
-        {
-          int K = (k + istart) % 5;
-          auto &e = lines.find(vs[J]->pos + vs[K]->pos);
-          bone.edgeMatrix[i].edges[j][k] = e == lines.end() ? NULL : &e->second;
-          if (j == 0 && k == 4 && (bone.edgeMatrix[i].edges[j][k]==NULL || abs(bone.edgeMatrix[i].edges[j][k]->lengthSqr) < 1e-20))
-          {
-            cout << "bad edge 4 " << endl;
-          }
-        }
-      }
-    }
-    ii++;
-  }*/
 }
 
 void SpaceTime::calculateEdgeLengths()
