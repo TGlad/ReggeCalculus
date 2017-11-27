@@ -67,22 +67,22 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     Pentachoron *penta = bone.pentachorons[p];
     double s[5][5]; // square edge lengths
     for (int i = 0; i <= 4; i++)
-      for (int j = 1; j <= 4; j++)
+      for (int j = 0; j <= 4; j++)
         s[i][j] = penta->edgeMatrix[i][j] ? penta->edgeMatrix[i][j]->lengthSqr : 0; // error is in this edgeMatrix
-    double g[5][5]; // we don't use the 0 index, to match Brewin
+//#if defined(BREWIN2011)
+    Matrix<double, 4, 4> gdown;
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
-        g[i][j] = 0.5*(s[0][i] + s[0][j] - s[i][j]); // g[4][4] will be zero whenever edge [0][4] is timelike...  so h will all be undef
+        gdown(i-1,j-1) = 0.5*(s[0][i] + s[0][j] - s[i][j]); // g[4][4] will be zero whenever edge [0][4] is timelike...  so h will all be undef
+    Matrix<double, 4, 4> G = penta->M * gdown * penta->M.transpose();
     // TODO: I need to inverse this 4x4 matrix!, seems a bit slow! Is there a shortcut?
-#define UPSTAIRS_TO_DOWNSTAIRS
-#if defined(UPSTAIRS_TO_DOWNSTAIRS)
-    Matrix<double, 4, 4> G;
-    for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++)
-      G(i, j) = g[i + 1][j + 1];
+#define DOWNSTAIRS_TO_UPSTAIRS
+#if defined(DOWNSTAIRS_TO_UPSTAIRS)
     G = G.inverse().eval();
+#endif
+    double g[5][5];
     for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++)
       g[i + 1][j + 1] = G(i, j);
-#endif
 
 
     if (abs(g[4][4]) < 1e-20 || abs(g[3][3]) < 1e-20)
@@ -115,13 +115,33 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     }
     Vector4 m4 = -sign(h[4][4]) * Vector4(h[3][1], h[3][2], h[3][3], h[3][4]) / sqrt(abs(h[4][4]) + 1e-10); // TODO: is this correct?
 
+    double m3m4 = m3.dot(m4); // TODO: try the Hartle eq 3.9 version of this m3m4 value, and see what result we get
+    double n3m4 = n3.dot(m4);
+#if 1//else // HARTLE85
+    Matrix<double, 4, 4> WaWb, Va, Vb;
+    int as[] = { 0, 1, 2, 3 };
+    int bs[] = { 0, 1, 2, 4 };
+    for (int i = 0; i < 4; i++)
+    {
+      for (int j = 0; j < 4; j++)
+      {
+        WaWb(i, j) = s[as[i]][bs[j]];
+        Va(i, j) = s[as[i]][as[j]];
+        Vb(i, j) = s[bs[i]][bs[j]];
+      }
+    }
+    double wawb = WaWb.determinant() / 24.0;
+    double va = Va.determinant() / 24.0;
+    double vb = Vb.determinant() / 24.0;
+    double m3m42 = wawb / (va*vb + 1e-10);
+
+    double n3m42 = 0; // TODO: how do we calculate this??
+#endif
     double phi34;
-    double m3m4 = m3.dot(m4);
     if (bone.signature == -1)
       phi34 = acos(m3m4);
     else
     {
-      double n3m4 = n3.dot(m4);;
       double rho12 = abs(m3m4) < abs(n3m4) ? sign(n3m4)*m3m4 : sign(m3m4)*n3m4;
       phi34 = sign(m3.dot(m3)) * asinh(rho12);
     }

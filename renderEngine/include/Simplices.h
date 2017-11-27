@@ -70,4 +70,6 @@ struct Pentachoron
   Tetrahedron *volumes[5];
 
   Line *edgeMatrix[5][5];
+  Matrix<double, 4, 4, Eigen::DontAlign> M;
+ // EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };

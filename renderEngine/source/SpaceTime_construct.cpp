@@ -94,7 +94,7 @@ void SpaceTime::build()
                                 if (i != 0)
                                   cout << "bll" << endl;
                               }
-                              if (sign > 0)
+                              if (true)//(sign > 0)
                                 pentachorons[ev] = Pentachoron(vertices[0], vertices[1], vertices[2], vertices[3], vertices[4]);
                               else
                                 pentachorons[ev] = Pentachoron(vertices[0], vertices[1], vertices[2], vertices[4], vertices[3]); // reverse orientation, is this right?
@@ -278,14 +278,10 @@ void SpaceTime::setTriangleEdgeMatrices()
     Pentachoron &penta = pentaPair.second;
     for (int j = 0; j <= 4; j++)
     {
-      for (int k = 1; k <= 4; k++)
+      for (int k = 0; k <= 4; k++)
       {
         auto &e = lines.find(penta.corners[j]->pos + penta.corners[k]->pos);
         penta.edgeMatrix[j][k] = e == lines.end() ? NULL : &e->second;
-        if (j == 0 && k == 4 && (penta.edgeMatrix[j][k] == NULL || abs(penta.edgeMatrix[j][k]->lengthSqr) < 1e-20))
-        {
-          cout << "bad edge 4 " << endl;
-        }
       }
     }
   }
@@ -301,6 +297,11 @@ void SpaceTime::calculateEdgeLengths()
   }
 }
 
+Vector4d toVector4d(const Vector4 &v)
+{
+  return Vector4d(v.t, v.x, v.y, v.z);
+}
+
 void SpaceTime::init()
 {
   build();
@@ -308,5 +309,15 @@ void SpaceTime::init()
   connect();
   setTriangleEdgeMatrices();
   calculateSignatures();
+
+  // work out transform to standard right-angled pentachoron
+  for (auto &pentPair : pentachorons)
+  {
+    Pentachoron &pent = pentPair.second;
+    for (int i = 0; i < 4; i++)
+      pent.M.row(i) = toVector4d(pent.corners[i+1]->pos - pent.corners[0]->pos);
+    // TODO: do we need to invert M?
+    pent.M = pent.M.inverse().eval();
+  }
 }
 
