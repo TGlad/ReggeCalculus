@@ -97,26 +97,19 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
         h[i][j] = g[i][j] - (g[4][i] * g[4][j]) / g[4][4];
-    bool off = ((int)penta->corners[0]->pos.t) % 2 || ((int)penta->corners[0]->pos.x) % 2 || ((int)penta->corners[0]->pos.y) % 2 || ((int)penta->corners[0]->pos.z) % 2;
-    if (abs(h[3][3]) < 1e-20)
-    {
-      cout << "bad h metric" << endl;
-//      ASSERT(false);
-    }
-    Vector4 m3 = -sign(h[3][3]) * Vector4(h[4][1], h[4][2], h[4][3], h[4][4]) / sqrt(abs(h[3][3]) + 1e-10);
+    Vector4 m3 = sign(h[3][3]) * Vector4(h[3][1], h[3][2], h[3][3], h[3][4]) / sqrt(abs(h[3][3]) + 1e-10);
     // m4 just symmetric to the m3 block above
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
         h[i][j] = g[i][j] - (g[3][i] * g[3][j]) / g[3][3];
-    if (abs(h[4][4]) < 1e-20)
-    {
-      cout << "bad h metric 2" << endl;
-      ASSERT(false);
-    }
-    Vector4 m4 = -sign(h[4][4]) * Vector4(h[3][1], h[3][2], h[3][3], h[3][4]) / sqrt(abs(h[4][4]) + 1e-10); // TODO: is this correct?
+    Vector4 m4 = sign(h[4][4]) * Vector4(h[4][1], h[4][2], h[4][3], h[4][4]) / sqrt(abs(h[4][4]) + 1e-10); // TODO: is this correct?
 
     double m3m4 = m3.dot(m4); // TODO: try the Hartle eq 3.9 version of this m3m4 value, and see what result we get
     double n3m4 = n3.dot(m4);
+    if (abs(m3m4) > 1e-6)
+      cout << "blah" << endl;
+    if (((int)penta->corners[0]->pos.t) % 2)
+      cout << "middle" << endl;
 #if 1//else // HARTLE85
     Matrix<double, 4, 4> WaWb, Va, Vb;
     int as[] = { 0, 1, 2, 3 };
@@ -125,16 +118,17 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     {
       for (int j = 0; j < 4; j++)
       {
-        WaWb(i, j) = s[as[i]][bs[j]];
-        Va(i, j) = s[as[i]][as[j]];
-        Vb(i, j) = s[bs[i]][bs[j]];
+        WaWb(i, j) = 0.5*(s[0][as[i]] + s[0][bs[j]] - s[as[i]][bs[j]]);
+        Va(i, j) = 0.5*(s[0][as[i]] + s[0][as[j]] - s[as[i]][as[j]]);
+        Vb(i, j) = 0.5*(s[0][bs[i]] + s[0][bs[j]] - s[bs[i]][bs[j]]);
       }
     }
     double wawb = WaWb.determinant() / 24.0;
     double va = Va.determinant() / 24.0;
     double vb = Vb.determinant() / 24.0;
     double m3m42 = wawb / (va*vb + 1e-10);
-
+    if (m3m42 != m3m4)
+      cout << "mismatch" << endl;
     double n3m42 = 0; // TODO: how do we calculate this??
 #endif
     double phi34;
