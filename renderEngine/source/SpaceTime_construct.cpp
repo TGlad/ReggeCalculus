@@ -319,5 +319,12 @@ void SpaceTime::init()
     // TODO: do we need to invert M?
     pent.M = pent.M.inverse().eval();
   }
+
+  // perturb edge lengths
+  for (auto &edgePair : lines)
+  {
+    Line &edge = edgePair.second;
+    edge.lengthSqr += random(-0.5, 0.5);
+  }
 }
 

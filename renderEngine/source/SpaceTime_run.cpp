@@ -70,19 +70,16 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
       for (int j = 0; j <= 4; j++)
         s[i][j] = penta->edgeMatrix[i][j] ? penta->edgeMatrix[i][j]->lengthSqr : 0; // error is in this edgeMatrix
 //#if defined(BREWIN2011)
-    Matrix<double, 4, 4> gdown;
+    Matrix<double, 4, 4> gd;
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
-        gdown(i-1,j-1) = 0.5*(s[0][i] + s[0][j] - s[i][j]); // g[4][4] will be zero whenever edge [0][4] is timelike...  so h will all be undef
-    Matrix<double, 4, 4> G = penta->M * gdown * penta->M.transpose();
-    // TODO: I need to inverse this 4x4 matrix!, seems a bit slow! Is there a shortcut?
-#define DOWNSTAIRS_TO_UPSTAIRS
-#if defined(DOWNSTAIRS_TO_UPSTAIRS)
-    G = G.inverse().eval();
-#endif
+        gd(i-1,j-1) = 0.5*(s[0][i] + s[0][j] - s[i][j]); // g[4][4] will be zero whenever edge [0][4] is timelike...  so h will all be undef
+    Matrix<double, 4, 4> gup = penta->M * gd * penta->M.transpose();
+    
+    Matrix<double, 4, 4> gdown = gup.inverse();
     double g[5][5];
     for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++)
-      g[i + 1][j + 1] = G(i, j);
+      g[i + 1][j + 1] = gdown(i, j);
 
 
     if (abs(g[4][4]) < 1e-20 || abs(g[3][3]) < 1e-20)
@@ -102,7 +99,12 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
         h[i][j] = g[i][j] - (g[3][i] * g[3][j]) / g[3][3];
-    Vector4 m4 = sign(h[4][4]) * Vector4(h[4][1], h[4][2], h[4][3], h[4][4]) / sqrt(abs(h[4][4]) + 1e-10); // TODO: is this correct?
+    Vector4 m4up = sign(h[4][4]) * Vector4(h[4][1], h[4][2], h[4][3], h[4][4]) / sqrt(abs(h[4][4]) + 1e-10); // TODO: is this correct?
+    
+    Vector4d m4down = gdown * Vector4d(m4up.t, m4up.x, m4up.y, m4up.z);
+    Vector4d m3d = gdown * Vector4d(m3.t, m3.x, m3.y, m3.z);
+    Vector4 m3down(m3d[0], m3d[1], m3d[2], m3d[3]);
+    Vector4 m4(m4down[0], m4down[1], m4down[2], m4down[3]);
 
     double m3m4 = m3.dot(m4); // TODO: try the Hartle eq 3.9 version of this m3m4 value, and see what result we get
     double n3m4 = n3.dot(m4);
@@ -111,25 +113,39 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     if (((int)penta->corners[0]->pos.t) % 2)
       cout << "middle" << endl;
 #if 1//else // HARTLE85
-    Matrix<double, 4, 4> WaWb, Va, Vb;
-    int as[] = { 0, 1, 2, 3 };
-    int bs[] = { 0, 1, 2, 4 };
-    for (int i = 0; i < 4; i++)
+    Matrix<double, 3, 3> WaWb, Va, Vb;
+    int as[] = { 1, 2, 3 };
+    int bs[] = { 1, 2, 4 };
+    for (int i = 0; i < 3; i++)
     {
-      for (int j = 0; j < 4; j++)
+      for (int j = 0; j < 3; j++)
       {
         WaWb(i, j) = 0.5*(s[0][as[i]] + s[0][bs[j]] - s[as[i]][bs[j]]);
         Va(i, j) = 0.5*(s[0][as[i]] + s[0][as[j]] - s[as[i]][as[j]]);
         Vb(i, j) = 0.5*(s[0][bs[i]] + s[0][bs[j]] - s[bs[i]][bs[j]]);
       }
     }
-    double wawb = WaWb.determinant() / 24.0;
-    double va = Va.determinant() / 24.0;
-    double vb = Vb.determinant() / 24.0;
-    double m3m42 = wawb / (va*vb + 1e-10);
+    double wawb = WaWb.determinant() / 36.0;
+    double va = Va.determinant() / 36.0;
+    double vb = Vb.determinant() / 36.0;
+    double m3m42 = wawb / sqrt(va*vb + 1e-10);   // cosAngle // seems more likely to be correct here...
     if (m3m42 != m3m4)
       cout << "mismatch" << endl;
     double n3m42 = 0; // TODO: how do we calculate this??
+#define calc_sine_angle
+#if defined(calc_sine_angle)
+    Matrix<double,2,2> Vbone;
+    Matrix<double, 4, 4> Vpent;
+    for (int i = 1; i <= 2; i++)
+      for (int j = 1; j <= 2; j++)
+        Vbone(i-1, j-1) = 0.5*(s[0][i] + s[0][j] - s[i][j]);
+    for (int i = 1; i <= 4; i++)
+      for (int j = 1; j <= 4; j++)
+        Vpent(i-1, j-1) = 0.5*(s[0][i] + s[0][j] - s[i][j]);
+    double vbone = Vbone.determinant() / 4.0;
+    double vpent = Vpent.determinant() / sqr(24);
+    double sineAngle = (4.0 / 3.0) * sqrt(vbone * vpent) / sqrt(va*vb + 1e-10); // Note that this and cosAngle equate (so are correct) for random values
+#endif
 #endif
     double phi34;
     if (bone.signature == -1)
@@ -137,7 +153,7 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     else
     {
       double rho12 = abs(m3m4) < abs(n3m4) ? sign(n3m4)*m3m4 : sign(m3m4)*n3m4;
-      phi34 = sign(m3.dot(m3)) * asinh(rho12);
+      phi34 = sign(m3.dot(m3down)) * asinh(rho12);
     }
     if (!(phi34 == phi34) || (phi34 && abs(phi34) < 1e-20))
       cout << "blah" << endl;
