@@ -70,44 +70,42 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
       for (int j = 0; j <= 4; j++)
         s[i][j] = penta->edgeMatrix[i][j] ? penta->edgeMatrix[i][j]->lengthSqr : 0; // error is in this edgeMatrix
 //#if defined(BREWIN2011)
-    Matrix<double, 4, 4> gd;
+    Matrix<double, 4, 4> gdown;
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
-        gd(i-1,j-1) = 0.5*(s[0][i] + s[0][j] - s[i][j]); // g[4][4] will be zero whenever edge [0][4] is timelike...  so h will all be undef
-    Matrix<double, 4, 4> gup = penta->M * gd * penta->M.transpose();
+        gdown(i-1,j-1) = 0.5*(s[0][i] + s[0][j] - s[i][j]); // g[4][4] will be zero whenever edge [0][4] is timelike...  so h will all be undef
+    Matrix<double, 4, 4> gd = penta->M * gdown * penta->M.transpose();
     
-    Matrix<double, 4, 4> gdown = gup.inverse();
-    double g[5][5];
+    Matrix<double, 4, 4> gup = gd.inverse();
+    double gu[5][5];
     for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++)
-      g[i + 1][j + 1] = gdown(i, j);
+      gu[i + 1][j + 1] = gup(i, j);
 
 
-    if (abs(g[4][4]) < 1e-20 || abs(g[3][3]) < 1e-20)
+    if (abs(gu[4][4]) < 1e-20 || abs(gu[3][3]) < 1e-20)
     {
       cout << "bad g metric" << endl;
       ASSERT(false);
     }
-    Vector4 n3 = -sign(g[4][4]) * Vector4(g[4][1], g[4][2], g[4][3], g[4][4]) / sqrt(abs(g[3][3]));
-    Vector4 n4 = -sign(g[3][3]) * Vector4(g[3][1], g[3][2], g[3][3], g[3][4]) / sqrt(abs(g[4][4])); // TODO: is this correct?
+    Vector4 n3u = -sign(gu[4][4]) * Vector4(gu[4][1], gu[4][2], gu[4][3], gu[4][4]) / sqrt(abs(gu[3][3]));
+    Vector4 n4u = -sign(gu[3][3]) * Vector4(gu[3][1], gu[3][2], gu[3][3], gu[3][4]) / sqrt(abs(gu[4][4])); // TODO: is this correct?
 
-    double h[5][5];
+    double hu[5][5];
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
-        h[i][j] = g[i][j] - (g[4][i] * g[4][j]) / g[4][4];
-    Vector4 m3 = sign(h[3][3]) * Vector4(h[3][1], h[3][2], h[3][3], h[3][4]) / sqrt(abs(h[3][3]) + 1e-10);
+        hu[i][j] = gu[i][j] - (gu[4][i] * gu[4][j]) / gu[4][4];
+    Vector4 m3u = sign(hu[3][3]) * Vector4(hu[3][1], hu[3][2], hu[3][3], hu[3][4]) / sqrt(abs(hu[3][3]) + 1e-10);
     // m4 just symmetric to the m3 block above
     for (int i = 1; i <= 4; i++)
       for (int j = 1; j <= 4; j++)
-        h[i][j] = g[i][j] - (g[3][i] * g[3][j]) / g[3][3];
-    Vector4 m4up = sign(h[4][4]) * Vector4(h[4][1], h[4][2], h[4][3], h[4][4]) / sqrt(abs(h[4][4]) + 1e-10); // TODO: is this correct?
+        hu[i][j] = gu[i][j] - (gu[3][i] * gu[3][j]) / gu[3][3];
+    Vector4 m4u = sign(hu[4][4]) * Vector4(hu[4][1], hu[4][2], hu[4][3], hu[4][4]) / sqrt(abs(hu[4][4]) + 1e-10); // TODO: is this correct?
     
-    Vector4d m4down = gdown * Vector4d(m4up.t, m4up.x, m4up.y, m4up.z);
-    Vector4d m3d = gdown * Vector4d(m3.t, m3.x, m3.y, m3.z);
-    Vector4 m3down(m3d[0], m3d[1], m3d[2], m3d[3]);
-    Vector4 m4(m4down[0], m4down[1], m4down[2], m4down[3]);
+    Vector4 m4d = gd * m4u;
+    Vector4 m3d = gd * m3u;
 
-    double m3m4 = m3.dot(m4); // TODO: try the Hartle eq 3.9 version of this m3m4 value, and see what result we get
-    double n3m4 = n3.dot(m4);
+    double m3m4 = m3u.dot(m4d); // TODO: try the Hartle eq 3.9 version of this m3m4 value, and see what result we get
+    double n3m4 = n3u.dot(m4d);
     if (abs(m3m4) > 1e-6)
       cout << "blah" << endl;
     if (((int)penta->corners[0]->pos.t) % 2)
@@ -153,7 +151,7 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     else
     {
       double rho12 = abs(m3m4) < abs(n3m4) ? sign(n3m4)*m3m4 : sign(m3m4)*n3m4;
-      phi34 = sign(m3.dot(m3down)) * asinh(rho12);
+      phi34 = sign(m3u.dot(m3d)) * asinh(rho12);
     }
     if (!(phi34 == phi34) || (phi34 && abs(phi34) < 1e-20))
       cout << "blah" << endl;
@@ -166,7 +164,7 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     {
       for (int v = 0; v < 4; v++)
       {
-        double scale = (m3[u] * n3[v] + m4[u] * n4[v]);
+        double scale = (m3u[u] * n3u[v] + m4u[u] * n4u[v]);
         Line *edge0 = penta->edgeMatrix[0][u + 1];
         if (edge0)
           mn.coeffRef(edge0->index) += 0.5*scale; // dguv/ds = 0.5

@@ -115,3 +115,4 @@ public:
   }
 };
 Vector4 operator *(double f, const Vector4& v);
+Vector4 operator *(const Eigen::Matrix<double, 4, 4> &mat, const Vector4& v);
