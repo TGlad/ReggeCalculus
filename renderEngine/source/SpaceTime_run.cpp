@@ -1,43 +1,61 @@
 #include "SpaceTime.h"
 #include "/Code/Eigen/SparseLU"
 
+
+#define TEST
 VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
 {
   for (auto &triPair : triangles)
   {
     Triangle &tri = triPair.second;
-    tri.deficitAngle = getDeficitAngle(tri);
+    tri.deficitAngle = tri.getDeficitAngle(lines.size());
     if (!(tri.deficitAngle == tri.deficitAngle) || (tri.deficitAngle && abs(tri.deficitAngle) < 1e-20))
       cout << "blah" << endl;
 
-    Line *e0i = tri.edges[0];
-    Line *e0j = tri.edges[1];
-    Line *eij = tri.edges[2];
-    double sij = eij->lengthSqr;
-    double s0i = e0i->lengthSqr;
-    double s0j = e0j->lengthSqr;
-
-    // below: Hartle '84 eq 3.7
-    tri.areaSquared = (s0i*s0j - 0.25*sqr(s0i + s0j - sij)) / 4.0; // correct
-    if (abs(tri.areaSquared) < 1e-20)
-      cout << "blah" << endl;
-    // TODO: I need to make these partial derivatives absolute by using a sparse vector
-    // Hartle '84 eq 3.13. I think this is right:
-    tri.areaSquaredDot.resize(lines.size());
-    tri.areaSquaredDot.coeffRef(e0i->index) = (1.0 / 8.0) * (s0j + sij - s0i);
-    tri.areaSquaredDot.coeffRef(e0j->index) = (1.0 / 8.0) * (s0i + sij - s0j);
-    tri.areaSquaredDot.coeffRef(eij->index) = (1.0 / 8.0) * (s0i + s0j - sij);
-    tri.areaDot.resize(lines.size());
-    tri.areaDot = tri.areaSquaredDot / (2.0 * sqrt(tri.areaSquared)); // correct
-    SparseMatrix<double> areaSquaredDotDot(lines.size(), lines.size());
-
-    areaSquaredDotDot.coeffRef(e0i->index, e0j->index) = 1; areaSquaredDotDot.coeffRef(e0i->index, eij->index) = 1; areaSquaredDotDot.coeffRef(e0i->index, e0i->index) = -1;
-    areaSquaredDotDot.coeffRef(e0j->index, e0i->index) = 1; areaSquaredDotDot.coeffRef(e0j->index, eij->index) = 1; areaSquaredDotDot.coeffRef(e0j->index, e0j->index) = -1;
-    areaSquaredDotDot.coeffRef(eij->index, e0i->index) = 1; areaSquaredDotDot.coeffRef(eij->index, e0j->index) = 1; areaSquaredDotDot.coeffRef(eij->index, eij->index) = -1;
-    areaSquaredDotDot *= 1.0 / 8.0;
-    // TODO: is this transpose correct?
-    tri.areaDotDot = (areaSquaredDotDot * sqrt(tri.areaSquared) - tri.areaSquaredDot * tri.areaDot.transpose()) / (2.0*tri.areaSquared);
+    tri.calcAreaDot(lines.size());
+    tri.calcAreaDotDot(lines.size());
   }
+#if defined(TEST)
+  // we know change in angle with change in lengths,
+  // so randomly change lengths, calculate suposed change and compare to actual
+  SparseVector<double> change(lines.size());
+  const double eps = 0.01;
+  for (int i = 0; i < change.size(); i++)
+    change.coeffRef(i) = random(-eps, eps);
+  int i = 0;
+  for (auto &edgePair : lines)
+  {
+    Line &edge = edgePair.second;
+    edge.lengthSqr += change.coeff(i);
+    i++;
+  }
+  double totalError = 0;
+  double totalValue = 0;
+  for (auto &triPair : triangles)
+  {
+    Triangle &tri = triPair.second;
+#if defined(TEST_DEFICIT)
+    double expectedAngleChange = tri.deficitAngleDot.dot(change);
+    double angleChange = tri.getDeficitAngle(lines.size()) - tri.deficitAngle;
+    double error = abs(angleChange - expectedAngleChange);
+    if (error > 0.1*eps)
+      cout << "bad deficit change prediction for triangle " << i << ", expected: " << expectedAngleChange << ", actual: " << angleChange << endl;
+    totalValue += abs(angleChange);
+#else // test angle dot
+    SparseVector<double> expectedAreaDotChange = tri.areaDotDot * change;
+    SparseVector<double> areaDot = tri.areaDot;
+    tri.calcAreaDot(lines.size());
+    SparseVector<double> areaDotChange = tri.areaDot - areaDot;
+    double error = (areaDotChange - expectedAreaDotChange).norm();
+    if (error > 0.1*eps)
+      cout << "bad area dot prediction for triangle " << i << ", expected: " << expectedAreaDotChange << ", actual: " << areaDotChange << endl;
+    totalValue += areaDot.norm();
+#endif
+    totalError += error;
+  }
+  if (totalError > totalValue * 0.001)
+    cout << "bad overall prediction, error " << totalError << ", total value: " << totalValue << endl;
+#endif
 
   VectorXd edgeErrors(lines.size());
   for (auto &edgePair : lines)
@@ -57,14 +75,52 @@ VectorXd SpaceTime::getEdgeErrors(SparseMatrix<double> &jacobian)
   return edgeErrors;
 }
 
-double SpaceTime::getDeficitAngle(Triangle &bone)
+void Triangle::calcAreaDot(int numLines)
+{
+  areaDot.resize(numLines);
+  areaSquaredDot.resize(numLines);
+  Line *e0i = edges[0];
+  Line *e0j = edges[1];
+  Line *eij = edges[2];
+  double sij = eij->lengthSqr;
+  double s0i = e0i->lengthSqr;
+  double s0j = e0j->lengthSqr;
+
+  // below: Hartle '84 eq 3.7
+  areaSquared = (s0i*s0j - 0.25*sqr(s0i + s0j - sij)) / 4.0; // correct
+  if (abs(areaSquared) < 1e-20)
+    cout << "blah" << endl;
+  // TODO: I need to make these partial derivatives absolute by using a sparse vector
+  // Hartle '84 eq 3.13. I think this is right:
+  areaSquaredDot.coeffRef(e0i->index) = (1.0 / 8.0) * (s0j + sij - s0i);
+  areaSquaredDot.coeffRef(e0j->index) = (1.0 / 8.0) * (s0i + sij - s0j);
+  areaSquaredDot.coeffRef(eij->index) = (1.0 / 8.0) * (s0i + s0j - sij);
+  
+  areaDot = areaSquaredDot / (2.0 * sqrt(areaSquared)); // correct
+}
+
+void Triangle::calcAreaDotDot(int numLines)
+{
+  Line *e0i = edges[0];
+  Line *e0j = edges[1];
+  Line *eij = edges[2];
+  SparseMatrix<double> areaSquaredDotDot(numLines, numLines);
+  areaSquaredDotDot.coeffRef(e0i->index, e0j->index) = 1; areaSquaredDotDot.coeffRef(e0i->index, eij->index) = 1; areaSquaredDotDot.coeffRef(e0i->index, e0i->index) = -1;
+  areaSquaredDotDot.coeffRef(e0j->index, e0i->index) = 1; areaSquaredDotDot.coeffRef(e0j->index, eij->index) = 1; areaSquaredDotDot.coeffRef(e0j->index, e0j->index) = -1;
+  areaSquaredDotDot.coeffRef(eij->index, e0i->index) = 1; areaSquaredDotDot.coeffRef(eij->index, e0j->index) = 1; areaSquaredDotDot.coeffRef(eij->index, eij->index) = -1;
+  areaSquaredDotDot *= 1.0 / 8.0;
+  // TODO: is this transpose correct?
+  areaDotDot = (areaSquaredDotDot * sqrt(areaSquared) - areaSquaredDot * areaDot.transpose()) / (2.0*areaSquared);
+}
+
+double Triangle::getDeficitAngle(int numLines)
 {
   double sum = 0;
-  bone.deficitAngleDot.resize(lines.size());
+  deficitAngleDot.resize(numLines);
   static int xx = 0;
-  for (int p = 0; p < (int)bone.pentachorons.size(); p++)
+  for (int p = 0; p < (int)pentachorons.size(); p++)
   {
-    Pentachoron *penta = bone.pentachorons[p];
+    Pentachoron *penta = pentachorons[p];
     double s[5][5]; // square edge lengths
     for (int i = 0; i <= 4; i++)
       for (int j = 0; j <= 4; j++)
@@ -106,10 +162,8 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
 
     double m3m4 = m3u.dot(m4d); // TODO: try the Hartle eq 3.9 version of this m3m4 value, and see what result we get
     double n3m4 = n3u.dot(m4d);
-    if (abs(m3m4) > 1e-6)
-      cout << "blah" << endl;
-    if (((int)penta->corners[0]->pos.t) % 2)
-      cout << "middle" << endl;
+//    if (((int)penta->corners[0]->pos.t) % 2)
+//      cout << "middle" << endl;
 #if 1//else // HARTLE85
     Matrix<double, 3, 3> WaWb, Va, Vb;
     int as[] = { 1, 2, 3 };
@@ -127,8 +181,8 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     double va = Va.determinant() / 36.0;
     double vb = Vb.determinant() / 36.0;
     double m3m42 = wawb / sqrt(va*vb + 1e-10);   // cosAngle // seems more likely to be correct here...
-    if (m3m42 != m3m4)
-      cout << "mismatch" << endl;
+//    if (m3m42 != m3m4)
+//      cout << "mismatch" << endl;
     double n3m42 = 0; // TODO: how do we calculate this??
 #define calc_sine_angle
 #if defined(calc_sine_angle)
@@ -146,7 +200,7 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
 #endif
 #endif
     double phi34;
-    if (bone.signature == -1)
+    if (signature == -1)
       phi34 = acos(m3m4);
     else
     {
@@ -159,7 +213,7 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
     xx++;
 
     // Jacobian part
-    SparseVector<double> mn(lines.size());
+    SparseVector<double> mn(numLines);
     for (int u = 0; u < 4; u++)
     {
       for (int v = 0; v < 4; v++)
@@ -176,12 +230,12 @@ double SpaceTime::getDeficitAngle(Triangle &bone)
           mn.coeffRef(edge2->index) -= 0.5*scale; // dguv/ds = -0.5
       }
     }
-    mn *= 0.5 * bone.signature;
+    mn *= 0.5 * signature;
     
-    bone.deficitAngleDot += mn;
+    deficitAngleDot += mn;
   }
 
-  return bone.signature == -1 ? 2.0*pi - sum : -sum;
+  return signature == -1 ? 2.0*pi - sum : -sum;
 }
 
 void SpaceTime::update()

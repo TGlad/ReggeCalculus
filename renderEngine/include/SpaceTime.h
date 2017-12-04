@@ -14,7 +14,6 @@ struct SpaceTime
   void init();
   void update();
   VectorXd getEdgeErrors(SparseMatrix<double> &jacobian);
-  double getDeficitAngle(Triangle &bone);
 
 private:
   void build();

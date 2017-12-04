@@ -47,6 +47,10 @@ struct Triangle
   SparseVector<double> areaSquaredDot, areaDot;
   SparseVector<double> deficitAngleDot; // deficit angle with respect to all edges in full complex
   SparseMatrix<double> areaDotDot;
+
+  void calcAreaDot(int numLines);
+  void calcAreaDotDot(int numLines);
+  double getDeficitAngle(int numLines);
 };
 struct Tetrahedron
 {
