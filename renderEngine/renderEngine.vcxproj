@@ -96,6 +96,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="renderEngine.cpp" />
+    <ClCompile Include="source\Simplices.cpp" />
     <ClCompile Include="source\SpaceTime_construct.cpp" />
     <ClCompile Include="source\SpaceTime_run.cpp" />
     <ClCompile Include="source\Vector4.cpp" />
