@@ -140,6 +140,7 @@ double Triangle::getDeficitAngle(int numLines)
 
     // Jacobian part
     SparseVector<double> mn(numLines);
+    SparseVector<double> mn2(numLines);
 #define TRANSFORMED_DERIV
 #if defined(TRANSFORMED_DERIV)
     // for ij in 1,4
@@ -151,7 +152,7 @@ double Triangle::getDeficitAngle(int numLines)
         Matrix<double, 4, 4> gdb;
         gdb.setZero();
         gdb(i - 1, j - 1) = -1;
-        gdij[i][j] = penta->M * gdown * penta->M.transpose();
+        gdij[i][j] = penta->M * gdb * penta->M.transpose();
       }
     }
     for (int i = 1; i <= 4; i++)
@@ -162,7 +163,7 @@ double Triangle::getDeficitAngle(int numLines)
         gdb(j - 1, i - 1)++;
       for (int j = 1; j <= 4; j++)
         gdb(i - 1, j - 1)++;
-      gdij[0][i] = penta->M * gdown * penta->M.transpose();
+      gdij[0][i] = penta->M * gdb * penta->M.transpose();
     }
 
     for (int u = 0; u < 4; u++)
@@ -172,13 +173,30 @@ double Triangle::getDeficitAngle(int numLines)
         double scale = (m3u[u] * n3u[v] + m4u[u] * n4u[v]);
         for (int i = 0; i <= 4; i++)
         {
-          for (int j = 0; j <= 4; j++)
+          for (int j = 1; j <= 4; j++)
           {
             Line *edge = penta->edgeMatrix[i][j];
-            if (edge)
+            if (edge && gdij[i][j](u, v))
+            {
+              cout << "gdij: " << i << ", " << j << ", u: " << u << ", v: " << v << ": " << gdij[i][j](u, v) << endl;
               mn.coeffRef(edge->index) += 0.5 * scale * gdij[i][j](u, v); // TODO: is this right?
+            }
           }
         }
+
+        Line *edge0 = penta->edgeMatrix[0][u + 1];
+        if (edge0)
+          mn2.coeffRef(edge0->index) += 0.5*scale; // dguv/ds = 0.5
+        Line *edge1 = penta->edgeMatrix[0][v + 1];
+        if (edge1)
+          mn2.coeffRef(edge1->index) += 0.5*scale; // dguv/ds = 0.5
+        Line *edge2 = penta->edgeMatrix[u + 1][v + 1];
+        if (edge2)
+          mn2.coeffRef(edge2->index) -= 0.5*scale; // dguv/ds = -0.5
+
+        double err = (4.0*mn - mn2).norm();
+        if (err > 0.001)
+          cout << "error" << endl;
       }
     }
 #else
